@@ -1,0 +1,91 @@
+[info] run directory: runs_swin\swin_mpc50_ep20_lr0300_wd0100_as1
+[info] model: swin_tiny_patch4_window7_224
+[info] epochs: 20, lr: 0.0003, weight_decay: 0.01, accum_steps: 1
+[info] saved split_composition.json
+ep 01 | train acc 0.353 loss 2.118 | val acc 0.571 loss 1.359 
+ep 02 | train acc 0.618 loss 1.121 | val acc 0.552 loss 1.518 
+ep 03 | train acc 0.711 loss 0.869 | val acc 0.652 loss 1.312 
+ep 04 | train acc 0.747 loss 0.728 | val acc 0.743 loss 0.957 
+ep 05 | train acc 0.832 loss 0.517 | val acc 0.767 loss 0.940 
+ep 06 | train acc 0.870 loss 0.366 | val acc 0.767 loss 0.876 
+ep 07 | train acc 0.892 loss 0.309 | val acc 0.733 loss 0.972 
+ep 08 | train acc 0.900 loss 0.274 | val acc 0.795 loss 0.769 
+ep 09 | train acc 0.936 loss 0.186 | val acc 0.790 loss 0.934 
+ep 10 | train acc 0.930 loss 0.188 | val acc 0.776 loss 0.888 
+ep 11 | train acc 0.953 loss 0.151 | val acc 0.776 loss 0.955 
+ep 12 | train acc 0.955 loss 0.138 | val acc 0.805 loss 0.812 
+ep 13 | train acc 0.970 loss 0.094 | val acc 0.833 loss 0.737 
+ep 14 | train acc 0.972 loss 0.077 | val acc 0.833 loss 0.793 
+ep 15 | train acc 0.978 loss 0.066 | val acc 0.810 loss 0.815 
+ep 16 | train acc 0.986 loss 0.040 | val acc 0.814 loss 0.810 
+ep 17 | train acc 0.989 loss 0.037 | val acc 0.814 loss 0.813 
+ep 18 | train acc 0.989 loss 0.034 | val acc 0.824 loss 0.790 
+ep 19 | train acc 0.997 loss 0.021 | val acc 0.833 loss 0.790 
+ep 20 | train acc 0.992 loss 0.036 | val acc 0.829 loss 0.793 
+[info] saved curves.png, metrics.csv, run_config.json
+
+Validation report:
+              precision    recall  f1-score   support
+
+        BCNH      1.000     0.900     0.947        10
+        BLSK      1.000     1.000     1.000        10
+        BRPE      1.000     0.900     0.947        10
+       BRPEC      1.000     0.800     0.889        10
+        CAEG      0.769     1.000     0.870        10
+        GBHE      0.818     0.900     0.857        10
+        GREG      0.714     0.500     0.588        10
+        LAGU      0.714     1.000     0.833        10
+       MEGRT      0.857     0.600     0.706        10
+        MTRN      0.636     0.700     0.667        10
+      OTHERS      0.727     0.800     0.762        10
+        OTHR      1.000     1.000     1.000        10
+        REEG      0.909     1.000     0.952        10
+      REEGWM      0.750     0.900     0.818        10
+        ROSP      1.000     0.900     0.947        10
+        ROTE      0.833     0.500     0.625        10
+        SATE      0.750     0.900     0.818        10
+        SNEG      0.600     0.600     0.600        10
+        TRHE      0.909     1.000     0.952        10
+        WHIB      0.667     0.600     0.632        10
+       WHIBC      1.000     1.000     1.000        10
+
+    accuracy                          0.833       210
+   macro avg      0.841     0.833     0.829       210
+weighted avg      0.841     0.833     0.829       210
+
+Validation report macro-F1: 0.829
+Validation report mAP (macro, one-vs-rest): 0.887
+
+Test report:
+              precision    recall  f1-score   support
+
+        BCNH      0.900     0.900     0.900        10
+        BLSK      0.909     1.000     0.952        10
+        BRPE      1.000     0.500     0.667        10
+       BRPEC      1.000     0.900     0.947        10
+        CAEG      0.714     1.000     0.833        10
+        GBHE      0.818     0.900     0.857        10
+        GREG      0.500     0.800     0.615        10
+        LAGU      0.889     0.800     0.842        10
+       MEGRT      0.400     0.200     0.267        10
+        MTRN      0.833     0.500     0.625        10
+      OTHERS      0.545     0.600     0.571        10
+        OTHR      0.818     0.900     0.857        10
+        REEG      0.900     0.900     0.900        10
+      REEGWM      0.600     0.900     0.720        10
+        ROSP      1.000     0.600     0.750        10
+        ROTE      0.692     0.900     0.783        10
+        SATE      0.727     0.800     0.762        10
+        SNEG      0.833     0.500     0.625        10
+        TRHE      0.909     1.000     0.952        10
+        WHIB      0.556     0.500     0.526        10
+       WHIBC      0.909     1.000     0.952        10
+
+    accuracy                          0.767       210
+   macro avg      0.784     0.767     0.757       210
+weighted avg      0.784     0.767     0.757       210
+
+Test report macro-F1: 0.757
+Test report mAP (macro, one-vs-rest): 0.868
+[info] saved cm_val.png, cm_test.png, val_test_cms.png, *_ap_per_class.json, summary.json
+[time] TOTAL script wall time: 0:02:02.538174
