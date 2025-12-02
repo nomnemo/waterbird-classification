@@ -1,0 +1,14 @@
+# Python env / caches
+.venv/
+__pycache__/
+*.pyc
+
+# IDE 
+.vscode/
+*.tmp
+
+
+# Data + large logs
+*.pt
+*.pth
+checkpoints/
