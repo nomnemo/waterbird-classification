@@ -98,6 +98,22 @@ def create_grouped_splits(
     
     return train_idx, val_idx, test_idx
 
+def _print_top_5_species(name: str, indices: List[int]):
+    """
+    Prints top5 species for a given split.
+    """
+    sub = record_species_list[indices]
+    c = Counter(sub)
+    total = len(sub)
+    top = ", ".join(f"{k}:{v}" for k,v in c.most_common(5))
+    print(f"[{name}] n={total} | top5: {top}")
+
+def _get_records(indices):
+    """
+    Given a list of indices, return the corresponding records.
+    """
+    return [records[i] for i in indices]
+
 # === MAIN ===
 print(f"[info] reading {json_data}")
 records = json.loads(json_data.read_text(encoding="utf-8"))
@@ -126,26 +142,19 @@ parent_img_to_img_indices = defaultdict(list)
 for idx, parent in enumerate(parent_images_per_record):
     parent_img_to_img_indices[parent].append(idx)
 
-print(f"[info] parent-grouped sizes: train={len(train_idx)}, val={len(val_idx)}, test={len(test_idx)}")
+print(f"[info] parent-grouped sizes: \n"
+      f"      train={len(train_idx)}, \n"
+      f"      val={len(val_idx)}, test={len(test_idx)}")
 print(f"[info] unique parents: total={len(parent_img_to_img_indices)}, "
-      f"train={len(set(parent_images_per_record[train_idx]))}, val={len(set(parent_images_per_record[val_idx]))}, test={len(set(parent_images_per_record[test_idx]))}")
-
-def _summarize(name, indices):
-    sub = record_species_list[indices]
-    c = Counter(sub)
-    total = len(sub)
-    top = ", ".join(f"{k}:{v}" for k,v in c.most_common(5))
-    print(f"[{name}] n={total} | top5: {top}")
-
-_summarize("train", train_idx)
-_summarize("val  ", val_idx)
-_summarize("test ", test_idx)
+      f"train={len(set(parent_images_per_record[train_idx]))}, "
+      f"val={len(set(parent_images_per_record[val_idx]))}, "
+      f"test={len(set(parent_images_per_record[test_idx]))}")
+_print_top_5_species("train", train_idx)
+_print_top_5_species("val  ", val_idx)
+_print_top_5_species("test ", test_idx)
 
 # ==== write CSVs ====
-def _select(indices):
-    return [records[i] for i in indices]
-
-_write_csv_from_list_of_dicts(train_csv, _select(train_idx))
-_write_csv_from_list_of_dicts(val_csv,   _select(val_idx))
-_write_csv_from_list_of_dicts(test_csv,  _select(test_idx))
+_write_csv_from_list_of_dicts(train_csv, _get_records(train_idx))
+_write_csv_from_list_of_dicts(val_csv,   _get_records(val_idx))
+_write_csv_from_list_of_dicts(test_csv,  _get_records(test_idx))
 print(f"[done] wrote:\n  {train_csv}\n  {val_csv}\n  {test_csv}")
