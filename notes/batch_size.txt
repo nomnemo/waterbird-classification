@@ -1,0 +1,72 @@
+Batch Size Notes
+================
+
+1. What batch size does
+-----------------------
+1) During training, the model updates its weights using the average gradient over a batch of examples.
+2) A **batch** is the number of samples processed before one gradient update.
+3) Batch size affects:
+   - How noisy each gradient update is.
+   - How much memory (VRAM) training uses.
+   - How many updates (steps) you get per epoch.
+
+2. Small vs large batch sizes
+-----------------------------
+Small batch (e.g., 8–32)
+- Pros:
+  - Noisier gradients can act like a form of regularization, often helping generalization.
+  - Sometimes more stable when the dataset is small or highly imbalanced.
+- Cons:
+  - More updates per epoch → training can be slower in wall‑clock time.
+  - Each update is based on fewer examples (more random variation).
+
+Medium batch (e.g., 32–128)
+- Often a good “default range”:
+  - Gradients are reasonably stable.
+  - Good GPU utilization.
+  - Generalization usually comparable or better than very large batches.
+
+Very large batch (e.g., 256+)
+- Pros:
+  - Fewer steps per epoch.
+  - Efficient on big GPUs when you have huge datasets.
+- Cons:
+  - Can hurt generalization if learning rate and regularization are not carefully retuned.
+  - Less gradient noise, which can make optimization get “stuck” in sharper minima.
+
+3. Interaction with learning rate
+---------------------------------
+1) Batch size and learning rate are linked:
+   - Increasing batch size without changing LR often makes updates “gentler”.
+   - Decreasing batch size makes updates noisier.
+2) Rough rule of thumb:
+   - If you double the batch size, you can often roughly double the learning rate to keep training dynamics similar (this is only an approximation).
+3) In practice:
+   - Learning rate and weight decay usually have more impact on final performance than small changes in batch size (as long as batch size is in a reasonable range).
+
+4. Why batch size matters for this project
+-----------------------------------------
+1) The dataset is long‑tailed and uses a `WeightedRandomSampler`:
+   - Each batch should contain a mix of classes.
+   - Too tiny a batch might have very few distinct classes per step.
+2) Current choice:
+   - `BATCH_TRAIN = 32` in `scripts/4_dataloader.py`.
+   - This is a reasonable compromise between:
+     - Enough samples per batch for stable gradients.
+     - Not too large for GPU memory.
+
+5. When to tune batch size
+--------------------------
+1) Batch size is an important hyperparameter, but usually **secondary** compared to:
+   - Learning rate.
+   - Weight decay.
+   - Number of epochs.
+   - Data volume and class balancing.
+2) Reasons to change batch size:
+   - VRAM limits: if you run out of memory, reduce batch size or use gradient accumulation.
+   - Instability: if training is very unstable (loss spikes, NaNs), a smaller batch may help.
+   - Throughput: if the GPU is under‑utilized and memory usage is low, you can try a larger batch.
+3) For this project:
+   - A full sweep over many batch sizes is probably not the best use of time.
+   - A light check (e.g., compare 16 vs 32 vs 64) is enough to confirm that 32 is in a good range.
+   - Focus tuning on learning rate, weight decay, `max_per_class`, and other modeling choices.
