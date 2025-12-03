@@ -12,3 +12,4 @@ __pycache__/
 *.pt
 *.pth
 checkpoints/
+data/crops
