@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import pandas as pd
 
-from scripts.image_transformer import get_transforms
+from scripts.ImageTransformer import get_transforms
 from scripts.BirdDataset import BirdDataset
 
 """
