@@ -260,8 +260,9 @@ def main():
 
     # ----- training loop -----
     for ep in range(1, EPOCHS+1):
+        ep_start = time.perf_counter()
+
         # train pass
-        
         # put model in training mode
         model.train() 
         
@@ -319,14 +320,18 @@ def main():
         val_loss = v_loss    / max(1, v_count)
         t_ep_val = time.perf_counter() - t_val
 
+        ep_dt = time.perf_counter() - ep_start
+
         history["train_loss"].append(train_loss)
         history["train_acc"].append(train_acc)
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
 
         log(
-            f"ep {ep:02d} | train acc {train_acc:.3f} loss {train_loss:.3f} "
-            f"| val acc {val_acc:.3f} loss {val_loss:.3f} "
+            f"ep {ep:02d} | "
+            f"train acc {train_acc:.3f} loss {train_loss:.3f} | "
+            f"val acc {val_acc:.3f} loss {val_loss:.3f} | "
+            f"val_time {t_ep_val:.1f}s | ep_time {ep_dt:.1f}s"
         )
 
         if val_acc > best_val:
