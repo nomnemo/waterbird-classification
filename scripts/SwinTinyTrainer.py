@@ -12,25 +12,31 @@ from torch import nn
 from torch.optim import AdamW
 from torch.amp import GradScaler, autocast
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from sklearn.metrics import (classification_report, confusion_matrix, f1_score,
-                             average_precision_score)
+from sklearn.metrics import (
+    classification_report,
+    f1_score,
+    average_precision_score,
+)
 from scripts.DataLoader import set_up_data_loaders
 
 # ===== config =====
 MODEL_NAME   = "swin_tiny_patch4_window7_224"
-EPOCHS       = 40 
+EPOCHS       = 40
 LR           = 1e-4
 WEIGHT_DECAY = 0.01
-ACCUM_STEPS  = 1 
-DEVICE       = "cuda" if torch.cuda.is_available() else "cpu" # what is this doing?
-
-AMP          = True # what is thos
+ACCUM_STEPS  = 1
+DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
+AMP          = True
 CKPT_PATH    = "best_swin.pt"
-MAX_PER_CLASS = 100 
-OUT_DIR      = Path("runs_swin2")  
+MAX_PER_CLASS = 100
+OUT_DIR      = Path("runs_swin2")
 OUT_DIR.mkdir(exist_ok=True)
 # Optional log file path; set inside main() once the run directory is known.
 LOG_PATH: Optional[Path] = None
+
+# Learning rate warmup and early stopping
+WARMUP_EPOCHS = 2
+EARLY_STOP_PATIENCE = 5
 # ==================
 
 
@@ -248,7 +254,7 @@ def main():
     # ----- model / opt -----
     model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=num_classes).to(DEVICE)
     opt   = AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
-    sched = CosineAnnealingLR(opt, T_max=EPOCHS)
+    sched = CosineAnnealingLR(opt, T_max=max(EPOCHS - WARMUP_EPOCHS, 1))
     scaler= GradScaler(device="cuda", enabled=AMP)
     # Print out the model config used for this run
     log(f"[info] model: {MODEL_NAME}")
@@ -256,11 +262,24 @@ def main():
 
     # training logs
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
-    best_val = 0.0
+    best_metric = float("-inf")  # best validation macro-F1 so far
+    patience_counter = 0
 
     # ----- training loop -----
     for ep in range(1, EPOCHS+1):
         ep_start = time.perf_counter()
+
+        # ----- learning rate warmup / schedule -----
+        if ep <= WARMUP_EPOCHS:
+            # Linear warmup from 0 -> LR over WARMUP_EPOCHS
+            warmup_factor = ep / max(WARMUP_EPOCHS, 1)
+            lr_now = LR * warmup_factor
+            for pg in opt.param_groups:
+                pg["lr"] = lr_now
+        else:
+            # After warmup, step cosine scheduler once per epoch
+            sched.step()
+            lr_now = opt.param_groups[0]["lr"]
 
         # train pass
         # put model in training mode
@@ -299,7 +318,6 @@ def main():
                 running_count   += yb.size(0)
                 running_loss    += loss.item() * yb.size(0)
 
-        sched.step()
         train_acc  = running_correct / max(1, running_count)
         train_loss = running_loss  / max(1, running_count)
 
@@ -307,6 +325,7 @@ def main():
         t_val = time.perf_counter()
         model.eval()
         v_loss = v_correct = v_count = 0
+        y_val_true, y_val_pred = [], []
         with torch.no_grad():
             for xb, yb in dl_val:
                 xb, yb = xb.to(DEVICE), yb.to(DEVICE)
@@ -314,10 +333,22 @@ def main():
                     logits = model(xb)
                     loss   = nn.functional.cross_entropy(logits, yb)
                 v_loss    += loss.item() * yb.size(0)
-                v_correct += (logits.argmax(1) == yb).sum().item()
+                preds = logits.argmax(1)
+                v_correct += (preds == yb).sum().item()
                 v_count   += yb.size(0)
+                y_val_true.extend(yb.cpu().tolist())
+                y_val_pred.extend(preds.cpu().tolist())
         val_acc  = v_correct / max(1, v_count)
         val_loss = v_loss    / max(1, v_count)
+        # macro-F1 on validation for early stopping
+        labels = list(range(num_classes))
+        val_macro_f1 = f1_score(
+            y_val_true,
+            y_val_pred,
+            labels=labels,
+            average="macro",
+            zero_division=0,
+        )
         t_ep_val = time.perf_counter() - t_val
 
         ep_dt = time.perf_counter() - ep_start
@@ -330,13 +361,25 @@ def main():
         log(
             f"ep {ep:02d} | "
             f"train acc {train_acc:.3f} loss {train_loss:.3f} | "
-            f"val acc {val_acc:.3f} loss {val_loss:.3f} | "
+            f"val acc {val_acc:.3f} loss {val_loss:.3f} macroF1 {val_macro_f1:.3f} | "
+            f"lr {lr_now:.2e} | "
             f"val_time {t_ep_val:.1f}s | ep_time {ep_dt:.1f}s"
         )
 
-        if val_acc > best_val:
-            best_val = val_acc
+        # ----- early stopping on validation macro-F1 -----
+        if val_macro_f1 > best_metric:
+            best_metric = val_macro_f1
+            patience_counter = 0
             torch.save({"model": model.state_dict(), "classes": classes, "name": MODEL_NAME}, CKPT_PATH)
+            log(f"[info] new best val macro-F1 {best_metric:.3f} at epoch {ep:02d}")
+        else:
+            patience_counter += 1
+            if patience_counter >= EARLY_STOP_PATIENCE:
+                log(
+                    f"[info] early stopping triggered at epoch {ep:02d} "
+                    f"(best val macro-F1 {best_metric:.3f})"
+                )
+                break
 
     # save curves & csv
     plot_curves(history, OUT_DIR / "curves.png")
