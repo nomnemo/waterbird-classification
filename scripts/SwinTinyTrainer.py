@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 import json
 import argparse
+from typing import Optional
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -28,7 +29,20 @@ CKPT_PATH    = "best_swin.pt"
 MAX_PER_CLASS = 100 
 OUT_DIR      = Path("runs_swin2")  
 OUT_DIR.mkdir(exist_ok=True)
+# Optional log file path; set inside main() once the run directory is known.
+LOG_PATH: Optional[Path] = None
 # ==================
+
+
+def log(message: str) -> None:
+    """
+    Log a message to stdout and, if LOG_PATH is set, append it to a log file.
+    """
+    print(message)
+    if LOG_PATH is not None:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(message + "\n")
 
 def make_run_dir_name(model_name: str, max_per_class: int, epochs: int, lr: float, 
                        weight_decay: float, accum_steps: int) -> str:
@@ -186,8 +200,8 @@ def evaluate_full(model, dl, classes, header, save_prefix):
     y_true, y_pred, probs = eval_collect(model, dl, len(classes))
 
     labels = list(range(len(classes)))
-    print(f"\n{header}:")
-    print(classification_report(
+    log(f"\n{header}:")
+    log(classification_report(
         y_true, y_pred,
         labels=labels,
         target_names=classes,
@@ -195,10 +209,10 @@ def evaluate_full(model, dl, classes, header, save_prefix):
         zero_division=0
     ))
     macro_f1 = f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0)
-    print(f"{header} macro-F1: {macro_f1:.3f}")
+    log(f"{header} macro-F1: {macro_f1:.3f}")
 
     mAP_macro, ap_cls = compute_map_ovr(y_true, probs, len(classes))
-    print(f"{header} mAP (macro, one-vs-rest): {mAP_macro:.3f}")
+    log(f"{header} mAP (macro, one-vs-rest): {mAP_macro:.3f}")
 
     metrics = {
         "macro_f1": float(macro_f1),
@@ -209,14 +223,15 @@ def evaluate_full(model, dl, classes, header, save_prefix):
     return metrics, y_true, y_pred
 
 def main():
-    global OUT_DIR
+    global OUT_DIR, LOG_PATH
 
     # ----- create run-specific output directory -----
     run_name = make_run_dir_name(MODEL_NAME, MAX_PER_CLASS, EPOCHS, LR, WEIGHT_DECAY, ACCUM_STEPS)
     run_dir = OUT_DIR / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
-    OUT_DIR = run_dir # Update global OUT_DIR to this run's subdirectory so all outputs go there
-    print(f"[info] run directory: {OUT_DIR}")
+    OUT_DIR = run_dir  # Update global OUT_DIR to this run's subdirectory so all outputs go there
+    LOG_PATH = OUT_DIR / "train.log"
+    log(f"[info] run directory: {OUT_DIR}")
 
 
     # ----- set up data loaders -----
@@ -227,7 +242,7 @@ def main():
     comp_test = split_composition(dl_test.dataset, classes)
     with open(OUT_DIR / "split_composition.json", "w", encoding="utf-8") as f:
         json.dump({"val": comp_val, "test": comp_test}, f, indent=2)
-    print("[info] saved split_composition.json")
+    log("[info] saved split_composition.json")
     
     
     # ----- model / opt -----
@@ -236,8 +251,8 @@ def main():
     sched = CosineAnnealingLR(opt, T_max=EPOCHS)
     scaler= GradScaler(device="cuda", enabled=AMP)
     # Print out the model config used for this run
-    print(f"[info] model: {MODEL_NAME}")
-    print(f"[info] epochs: {EPOCHS}, lr: {LR}, weight_decay: {WEIGHT_DECAY}, accum_steps: {ACCUM_STEPS}")
+    log(f"[info] model: {MODEL_NAME}")
+    log(f"[info] epochs: {EPOCHS}, lr: {LR}, weight_decay: {WEIGHT_DECAY}, accum_steps: {ACCUM_STEPS}")
 
     # training logs
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
@@ -309,7 +324,7 @@ def main():
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
 
-        print(
+        log(
             f"ep {ep:02d} | train acc {train_acc:.3f} loss {train_loss:.3f} "
             f"| val acc {val_acc:.3f} loss {val_loss:.3f} "
         )
@@ -320,7 +335,7 @@ def main():
 
     # save curves & csv
     plot_curves(history, OUT_DIR / "curves.png")
-    print("[info] saved curves.png")
+    log("[info] saved curves.png")
 
     # ----- final evaluation -----
     ckpt = torch.load(CKPT_PATH, map_location=DEVICE)
@@ -332,7 +347,7 @@ def main():
     # combined confusion matrices side-by-side
     plot_two_cms(val_y, val_p, test_y, test_p, classes, OUT_DIR / "val_test_cms.png", titles=("Validation", "Test"))
 
-    print("[info] saved val_test_cms.png")
+    log("[info] saved val_test_cms.png")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Swin with configurable hyperparameters")
