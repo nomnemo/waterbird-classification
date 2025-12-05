@@ -65,14 +65,33 @@ def make_run_dir_name(model_name: str, max_per_class: int, epochs: int, lr: floa
     return run_name
 
 def plot_curves(history, path):
-    fig = plt.figure(figsize=(7.5,4.5))
-    ep = np.arange(1, len(history["train_loss"])+1)
-    plt.plot(ep, history["train_loss"], label="train_loss")
-    plt.plot(ep, history["val_loss"],   label="val_loss")
-    plt.plot(ep, history["train_acc"],  label="train_acc")
-    plt.plot(ep, history["val_acc"],    label="val_acc")
-    plt.xlabel("epoch"); plt.legend(); plt.tight_layout()
-    fig.savefig(path, dpi=180); plt.close(fig)
+    """
+    Plot training vs validation loss and accuracy.
+
+    Produces a single image with two subplots:
+      - Top:  train_loss (blue) and val_loss (red)
+      - Bottom: train_acc (blue) and val_acc (red)
+    """
+    ep = np.arange(1, len(history["train_loss"]) + 1)
+
+    fig, (ax_loss, ax_acc) = plt.subplots(2, 1, figsize=(7.5, 6), sharex=True)
+
+    # Loss subplot
+    ax_loss.plot(ep, history["train_loss"], label="train_loss", color="blue")
+    ax_loss.plot(ep, history["val_loss"], label="val_loss", color="red")
+    ax_loss.set_ylabel("Loss")
+    ax_loss.legend()
+
+    # Accuracy subplot
+    ax_acc.plot(ep, history["train_acc"], label="train_acc", color="blue")
+    ax_acc.plot(ep, history["val_acc"], label="val_acc", color="red")
+    ax_acc.set_xlabel("Epoch")
+    ax_acc.set_ylabel("Accuracy")
+    ax_acc.legend()
+
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
 
 def plot_cm(y_true, y_pred, classes, path="cm.png"):
     from sklearn.metrics import confusion_matrix
