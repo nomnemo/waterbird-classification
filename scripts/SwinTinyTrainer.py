@@ -21,14 +21,14 @@ from scripts.DataLoader import set_up_data_loaders
 
 # ===== config =====
 MODEL_NAME   = "swin_tiny_patch4_window7_224"
-EPOCHS       = 40
+EPOCHS       = 30
 LR           = 1e-4
 WEIGHT_DECAY = 0.01
 ACCUM_STEPS  = 1
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 AMP          = True
 CKPT_PATH    = "best_swin.pt"
-MAX_PER_CLASS = 100
+MAX_PER_CLASS = 1000
 OUT_DIR      = Path("runs_swin2")
 OUT_DIR.mkdir(exist_ok=True)
 # Optional log file path; set inside main() once the run directory is known.
@@ -366,7 +366,7 @@ def main():
         log(
             f"ep {ep:02d} | "
             f"train acc {train_acc:.3f} loss {train_loss:.3f} | "
-            f"val acc {val_acc:.3f} loss {val_loss:.3f} macroF1 {val_macro_f1:.3f} | "
+            f"val acc {val_acc:.3f} loss {val_loss:.3f} | macroF1 {val_macro_f1:.3f} | "
             f"lr {lr_now:.2e} | "
             f"val_time {t_ep_val:.1f}s | ep_time {ep_dt:.1f}s"
         )
