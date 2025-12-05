@@ -93,47 +93,49 @@ def plot_curves(history, path):
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
-def plot_cm(y_true, y_pred, classes, path="cm.png"):
+def plot_two_cms(y1, p1, y2, p2, classes, path, titles=("Validation", "Test")):
+    """Plot two row-normalized confusion matrices side-by-side and save to path.
+
+    Values are expressed as percentages per true class (rows sum to 100%)."""
     from sklearn.metrics import confusion_matrix
     labels = list(range(len(classes)))
-    cm = confusion_matrix(y_true, y_pred, labels=labels)
-    fig = plt.figure(figsize=(10, 8))
-    ax = plt.gca()
-    im = ax.imshow(cm, interpolation="nearest")
-    ax.set_title("Confusion matrix")
-    fig.colorbar(im, fraction=0.046, pad=0.04)
-    ticks = np.arange(len(classes))
-    ax.set_xticks(ticks); ax.set_yticks(ticks)
-    ax.set_xticklabels(classes, rotation=90, fontsize=7)
-    ax.set_yticklabels(classes, fontsize=7)
-    ax.set_ylabel("True"); ax.set_xlabel("Predicted")
-    fig.tight_layout()
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
 
-def plot_two_cms(y1, p1, y2, p2, classes, path, titles=("Validation", "Test")):
-    """Plot two confusion matrices side-by-side and save to path."""
-    from sklearn.metrics import confusion_matrix
-    cm1 = confusion_matrix(y1, p1, labels=list(range(len(classes))))
-    cm2 = confusion_matrix(y2, p2, labels=list(range(len(classes))))
+    cm1 = confusion_matrix(y1, p1, labels=labels)
+    cm2 = confusion_matrix(y2, p2, labels=labels)
+
+    # Row-normalize to percentages (per true class).
+    def _row_normalize(cm):
+        row_sums = cm.sum(axis=1, keepdims=True)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            pct = np.divide(cm, row_sums, where=row_sums > 0) * 100.0
+        pct[np.isnan(pct)] = 0.0
+        return pct
+
+    cm1_pct = _row_normalize(cm1)
+    cm2_pct = _row_normalize(cm2)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-    for ax, cm, title in zip(axes, (cm1, cm2), titles):
-        im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
+    vmin, vmax = 0.0, 100.0
+    im = None
+    for ax, cm_pct, title in zip(axes, (cm1_pct, cm2_pct), titles):
+        im = ax.imshow(cm_pct, interpolation="nearest", cmap="Blues", vmin=vmin, vmax=vmax)
         ax.set_title(title)
         ticks = np.arange(len(classes))
         ax.set_xticks(ticks); ax.set_yticks(ticks)
         ax.set_xticklabels(classes, rotation=90, fontsize=7)
         ax.set_yticklabels(classes, fontsize=7)
-        ax.set_ylabel("True"); ax.set_xlabel("Predicted")
-        # annotate with counts
-        thresh = cm.max() / 2.0 if cm.size else 0
-        for i in range(cm.shape[0]):
-            for j in range(cm.shape[1]):
-                val = int(cm[i, j])
+        ax.set_ylabel("True label"); ax.set_xlabel("Predicted label")
+        # annotate with percentages
+        thresh = (cm_pct.max() + cm_pct.min()) / 2.0 if cm_pct.size else 0.0
+        for i in range(cm_pct.shape[0]):
+            for j in range(cm_pct.shape[1]):
+                val = cm_pct[i, j]
+                text = f"{val:.1f}" if val > 0 else "0.0"
                 color = "white" if val > thresh else "black"
-                ax.text(j, i, f"{val}", ha="center", va="center", color=color, fontsize=6)
-    fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.046, pad=0.04)
+                ax.text(j, i, text, ha="center", va="center", color=color, fontsize=6)
+
+    cbar = fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.046, pad=0.04)
+    cbar.set_label("Percentage (%)")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -179,7 +181,7 @@ def compute_map_ovr(y_true, probs, num_classes):
     return float(np.mean(ap_per_class)), np.array(ap_per_class)
 
 def evaluate_full(model, dl, classes, header, save_prefix):
-    """Full report + mAP + CM + saves predictions/probs."""
+    """Full report + mAP, returns metrics and predictions (no file output)."""
     y_true, y_pred, probs = eval_collect(model, dl, len(classes))
 
     labels = list(range(len(classes)))
@@ -196,12 +198,6 @@ def evaluate_full(model, dl, classes, header, save_prefix):
 
     mAP_macro, ap_cls = compute_map_ovr(y_true, probs, len(classes))
     print(f"{header} mAP (macro, one-vs-rest): {mAP_macro:.3f}")
-
-    # save per-class AP (no longer saving raw arrays)
-    with open(OUT_DIR / f"{save_prefix}_ap_per_class.json", "w", encoding="utf-8") as f:
-        json.dump({cls: float(ap) for cls, ap in zip(classes, ap_cls.tolist())}, f, indent=2)
-
-    plot_cm(y_true, y_pred, classes, OUT_DIR / f"{save_prefix}_cm.png")
 
     metrics = {
         "macro_f1": float(macro_f1),
@@ -323,19 +319,7 @@ def main():
 
     # save curves & csv
     plot_curves(history, OUT_DIR / "curves.png")
-    import csv
-    with open(OUT_DIR / "metrics.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["epoch","train_loss","train_acc","val_loss","val_acc"])
-        for i in range(EPOCHS):
-            w.writerow([i+1, history["train_loss"][i], history["train_acc"][i],
-                        history["val_loss"][i], history["val_acc"][i]])
-    with open(OUT_DIR / "run_config.json", "w", encoding="utf-8") as f:
-        json.dump({
-            "model": MODEL_NAME, "epochs": EPOCHS, "lr": LR, "weight_decay": WEIGHT_DECAY,
-            "accum_steps": ACCUM_STEPS
-        }, f, indent=2)
-    print("[info] saved curves.png, metrics.csv, run_config.json")
+    print("[info] saved curves.png")
 
     # ----- final evaluation -----
     ckpt = torch.load(CKPT_PATH, map_location=DEVICE)
@@ -347,9 +331,7 @@ def main():
     # combined confusion matrices side-by-side
     plot_two_cms(val_y, val_p, test_y, test_p, classes, OUT_DIR / "val_test_cms.png", titles=("Validation", "Test"))
 
-    with open(OUT_DIR / "summary.json", "w", encoding="utf-8") as f:
-        json.dump({"val": val_summary, "test": test_summary}, f, indent=2)
-    print("[info] saved cm_val.png, cm_test.png, val_test_cms.png, *_ap_per_class.json, summary.json")
+    print("[info] saved val_test_cms.png")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Swin with configurable hyperparameters")
