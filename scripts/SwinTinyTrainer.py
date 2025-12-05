@@ -237,13 +237,13 @@ def main():
     # ----- set up data loaders -----
     dl_train, dl_val, dl_test, meta = set_up_data_loaders(max_per_class=MAX_PER_CLASS)
     classes = meta["classes"]; num_classes = len(classes)
-    # spit out validation and test split distributions
-    comp_val  = split_composition(dl_val.dataset,  classes)
-    comp_test = split_composition(dl_test.dataset, classes)
+    # compute split compositions for train/val/test
+    comp_train = split_composition(dl_train.dataset, classes)
+    comp_val   = split_composition(dl_val.dataset,   classes)
+    comp_test  = split_composition(dl_test.dataset,  classes)
     with open(OUT_DIR / "split_composition.json", "w", encoding="utf-8") as f:
-        json.dump({"val": comp_val, "test": comp_test}, f, indent=2)
+        json.dump({"train": comp_train, "val": comp_val, "test": comp_test}, f, indent=2)
     log("[info] saved split_composition.json")
-    
     
     # ----- model / opt -----
     model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=num_classes).to(DEVICE)
